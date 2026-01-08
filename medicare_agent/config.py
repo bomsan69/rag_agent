@@ -15,6 +15,11 @@ class Settings(BaseSettings):
         env="OPENAI_EMBEDDING_MODEL"
     )
 
+    # Tavily Search Configuration
+    tavily_api_key: str | None = Field(default=None, env="TAVILY_API_KEY")
+    enable_web_search: bool = Field(default=True, env="ENABLE_WEB_SEARCH")
+    web_search_max_results: int = Field(default=5, env="WEB_SEARCH_MAX_RESULTS")
+
     # Application Configuration
     app_env: str = Field(default="development", env="APP_ENV")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")

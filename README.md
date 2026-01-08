@@ -11,8 +11,9 @@ A production-grade, citation-first RAG (Retrieval-Augmented Generation) system f
 - **Multi-language Support**: Ask in English or Korean (한국어) - responses match your language
 - **Complete Answers**: No more "I don't have information" for common Medicare questions
 - **Hybrid Search**: Combines BM25 (keyword) and vector search (semantic) for optimal retrieval
+- **Web Search Integration**: Automatically searches the web (via Tavily) when manual lacks information
 - **Query Expansion**: Automatically adds synonyms and related terms for better search coverage
-- **Agent Orchestration**: LangGraph-based pipeline with intent classification, query expansion, retrieval, reranking, generation, and verification
+- **Agent Orchestration**: LangGraph-based pipeline with intent classification, query expansion, retrieval, reranking, web search, generation, and verification
 - **Streaming Responses**: Server-Sent Events (SSE) for real-time answer streaming
 
 ## Architecture
@@ -28,6 +29,12 @@ Hybrid Retrieval (BM25 + Vector)
     ↓
 Reranking (select best evidence)
     ↓
+Check if manual has sufficient information
+    ├─ Yes → Skip web search
+    └─ No → Web Search (Tavily)
+         ↓
+    Combine manual + web results
+    ↓
 Answer Generation (citation-first)
     ↓
 Verification (accuracy + safety)
@@ -40,7 +47,7 @@ Response (with citations + confidence)
 ### Backend
 - **Framework**: FastAPI, Python 3.13+
 - **AI/ML**: OpenAI GPT-4, LangChain, LangGraph
-- **Search**: FAISS (vector), BM25 (keyword)
+- **Search**: FAISS (vector), BM25 (keyword), Tavily (web search)
 - **PDF Processing**: PyMuPDF
 - **Streaming**: SSE-Starlette
 
@@ -78,11 +85,17 @@ Create a `.env` file:
 cp .env.example .env
 ```
 
-Edit `.env` and add your OpenAI API key:
+Edit `.env` and add your API keys:
 
 ```env
-OPENAI_API_KEY=your-key-here
+OPENAI_API_KEY=your-openai-key-here
+TAVILY_API_KEY=your-tavily-key-here
 ```
+
+To get a Tavily API key (for web search):
+1. Visit https://tavily.com/
+2. Sign up for a free account
+3. Copy your API key from the dashboard
 
 ### 4. Build Search Index
 
@@ -255,6 +268,7 @@ medicare_agent/
 │   │   ├── ingestion.py     # PDF processing
 │   │   ├── retrieval.py     # Hybrid search
 │   │   ├── reranker.py      # Evidence selection
+│   │   ├── web_search.py    # Web search (Tavily)
 │   │   ├── generator.py     # Answer generation
 │   │   └── verifier.py      # Answer verification
 │   ├── utils/               # Utilities
@@ -285,6 +299,11 @@ All configuration is in `.env`:
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4-turbo-preview
 OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+
+# Tavily (Web Search)
+TAVILY_API_KEY=tvly-...
+ENABLE_WEB_SEARCH=true
+WEB_SEARCH_MAX_RESULTS=5
 
 # Application
 APP_ENV=development
@@ -417,7 +436,15 @@ Selects top-K evidence chunks with priority for:
 - Explicit conditions and exceptions
 - Relevant section types
 
-### 5. Citation Enforcement
+### 5. Web Search Integration
+
+Automatically triggers web search when manual information is insufficient:
+- Evaluates quality and quantity of retrieved chunks
+- Searches the web via Tavily API for supplementary information
+- Combines manual and web sources for comprehensive answers
+- Clearly distinguishes between manual citations and web sources
+
+### 6. Citation Enforcement
 
 Generator is constrained to:
 - Only use information from evidence
@@ -425,7 +452,7 @@ Generator is constrained to:
 - Use conservative language
 - Never hallucinate numbers/dates
 
-### 6. Verification
+### 7. Verification
 
 Multi-stage verification checks for:
 - Unsupported claims
