@@ -67,7 +67,7 @@ export default function ChatInput({ onSend, disabled = false, isLoading = false 
 
       {/* Input Area */}
       <div className="px-4 py-4">
-        <div className="max-w-4xl mx-auto relative">
+        <div className="mx-auto relative">
           <textarea
             ref={textareaRef}
             value={input}

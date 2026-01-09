@@ -95,3 +95,7 @@ Thumbs.db
 *.bak
 *.swp
 *~.nib
+
+# Docker
+docker-compose.override.yml
+.docker/

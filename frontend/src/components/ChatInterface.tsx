@@ -96,10 +96,11 @@ export default function ChatInterface() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-4 shadow-sm">
-        <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50 flex justify-center">
+      <div className="w-full lg:w-1/3 flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white lg:shadow-xl">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 px-4 py-4 shadow-sm">
+          <div className="mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -125,12 +126,12 @@ export default function ChatInterface() {
         </div>
       </header>
 
-      {/* Messages Area */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6"
-      >
-        <div className="max-w-4xl mx-auto">
+        {/* Messages Area */}
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto px-4 py-6"
+        >
+          <div className="mx-auto">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
               <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mb-4">
@@ -183,12 +184,13 @@ export default function ChatInterface() {
         </div>
       </div>
 
-      {/* Input Area */}
-      <ChatInput
-        onSend={handleSendMessage}
-        disabled={isLoading}
-        isLoading={isLoading}
-      />
+        {/* Input Area */}
+        <ChatInput
+          onSend={handleSendMessage}
+          disabled={isLoading}
+          isLoading={isLoading}
+        />
+      </div>
     </div>
   );
 }

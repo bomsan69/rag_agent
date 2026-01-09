@@ -147,7 +147,47 @@ cp .env.local.example .env.local
 
 The default configuration points to `http://localhost:8000/api/v1`. Update if your backend runs on a different port.
 
-## Usage
+## Docker Deployment (Recommended for Production)
+
+For easy deployment with Docker:
+
+### Quick Start
+
+```bash
+# 1. Set up environment
+cp .env.example .env
+# Edit .env and add your API keys
+
+# 2. Build and run
+docker-compose up -d --build
+
+# 3. Access the application
+# Frontend: http://localhost:4000
+# Backend API: http://localhost:8000
+# API Docs: http://localhost:8000/docs
+```
+
+### Build Indexes (First Time Only)
+
+```bash
+docker-compose run backend python scripts/build_index.py
+```
+
+### View Logs
+
+```bash
+docker-compose logs -f
+```
+
+### Stop Services
+
+```bash
+docker-compose down
+```
+
+For detailed Docker deployment instructions, see [DOCKER_DEPLOYMENT.md](./DOCKER_DEPLOYMENT.md).
+
+## Usage (Local Development)
 
 ### Start the Backend API Server
 
