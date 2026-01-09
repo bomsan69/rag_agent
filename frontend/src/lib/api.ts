@@ -1,26 +1,15 @@
 import { ChatRequest, ChatResponse } from '@/types/chat';
 
-// Dynamically determine API URL based on runtime environment
-function getApiUrl(): string {
-  // If running in browser, use the current hostname with backend port
-  if (typeof window !== 'undefined') {
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    return `${protocol}//${hostname}:8000/api/v1`;
-  }
-  // Fallback for server-side rendering
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-}
-
 export class ApiClient {
   private baseUrl: string;
 
-  constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || getApiUrl();
+  constructor() {
+    // Use Next.js API routes (relative paths work in both browser and server)
+    this.baseUrl = '/api';
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    const response = await fetch(`${this.baseUrl}/agent/chat`, {
+    const response = await fetch(`${this.baseUrl}/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -36,7 +25,7 @@ export class ApiClient {
   }
 
   async *chatStream(request: ChatRequest): AsyncGenerator<string> {
-    const response = await fetch(`${this.baseUrl}/agent/chat`, {
+    const response = await fetch(`${this.baseUrl}/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -87,6 +76,9 @@ export class ApiClient {
 
   async healthCheck(): Promise<{ status: string }> {
     const response = await fetch(`${this.baseUrl}/health`);
+    if (!response.ok) {
+      throw new Error(`Health check failed: ${response.statusText}`);
+    }
     return response.json();
   }
 }

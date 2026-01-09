@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Backend API Service
   backend:
@@ -32,8 +30,8 @@ services:
       dockerfile: Dockerfile
     container_name: medicare-agent-frontend
     environment:
-      # Frontend runs in browser, so it needs to access backend via localhost
-      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      # Backend API URL (server-side only, uses Docker service name)
+      - BACKEND_API_URL=http://backend:8000/api/v1
     ports:
       - "4000:3000"  # External port 4000 -> Internal port 3000
     depends_on:
