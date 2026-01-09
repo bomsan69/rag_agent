@@ -1,12 +1,22 @@
 import { ChatRequest, ChatResponse } from '@/types/chat';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+// Dynamically determine API URL based on runtime environment
+function getApiUrl(): string {
+  // If running in browser, use the current hostname with backend port
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:8000/api/v1`;
+  }
+  // Fallback for server-side rendering
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+}
 
 export class ApiClient {
   private baseUrl: string;
 
-  constructor(baseUrl: string = API_URL) {
-    this.baseUrl = baseUrl;
+  constructor(baseUrl?: string) {
+    this.baseUrl = baseUrl || getApiUrl();
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
