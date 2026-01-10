@@ -8,7 +8,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"  # localhost만 바인딩 (외부 인터넷 접근 차단)
     volumes:
       # Mount data directories for persistence
       - ./data:/app/data
@@ -30,10 +30,13 @@ services:
       dockerfile: Dockerfile
     container_name: medicare-agent-frontend
     environment:
-      # Backend API URL (server-side only, uses Docker service name)
-      - BACKEND_API_URL=http://backend:8000/api/v1
+      # Backend API URL - host.docker.internal로 호스트의 localhost:8000 접근
+      - BACKEND_API_URL=http://host.docker.internal:8000/api/v1
     ports:
-      - "4000:3000"  # External port 4000 -> Internal port 3000
+      - "4000:3000"  # External port 4000 -> Internal port 3000 (Cloudflare Zero Trust 연결용)
+    extra_hosts:
+      # Linux에서 host.docker.internal 지원을 위한 설정
+      - "host.docker.internal:host-gateway"
     depends_on:
       backend:
         condition: service_healthy
