@@ -81,3 +81,15 @@ class VerifyResponse(BaseModel):
         ...,
         description="Confidence level after verification"
     )
+
+
+class SessionCloseRequest(BaseModel):
+    """Request model for /session/close endpoint."""
+    session_id: str = Field(..., description="Session identifier to close")
+
+
+class SessionCloseResponse(BaseModel):
+    """Response model for /session/close endpoint."""
+    success: bool = Field(..., description="Whether session was successfully closed")
+    message: str = Field(..., description="Status message")
+    session_id: str = Field(..., description="Session identifier that was closed")

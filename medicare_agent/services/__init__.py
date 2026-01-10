@@ -5,6 +5,7 @@ from .retrieval import RetrievalService
 from .reranker import RerankerService
 from .generator import GeneratorService
 from .verifier import VerifierService
+from .conversation_history import ConversationHistoryService
 
 __all__ = [
     "IngestionService",
@@ -12,4 +13,5 @@ __all__ = [
     "RerankerService",
     "GeneratorService",
     "VerifierService",
+    "ConversationHistoryService",
 ]

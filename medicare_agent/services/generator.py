@@ -1,8 +1,8 @@
 """Answer generation service with citation enforcement."""
 
-from typing import List, Tuple, AsyncIterator
+from typing import List, Tuple, AsyncIterator, Dict, Any, Optional
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from medicare_agent.config import settings
 from medicare_agent.models.schemas import Chunk, Citation
 import logging
@@ -133,7 +133,8 @@ Remember: Be helpful, friendly, and clear. Elderly people need simple explanatio
         self,
         query: str,
         evidence_chunks: List[Chunk],
-        intent: str = "general"
+        intent: str = "general",
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Tuple[str, List[Citation]]:
         """Generate answer from evidence chunks.
 
@@ -141,6 +142,7 @@ Remember: Be helpful, friendly, and clear. Elderly people need simple explanatio
             query: User query
             evidence_chunks: Evidence chunks from retrieval
             intent: Query intent for context
+            conversation_history: Previous messages [{"role": "user"|"assistant", "content": "..."}]
 
         Returns:
             Tuple of (answer, citations)
@@ -171,11 +173,22 @@ Based ONLY on the evidence provided above, answer the user's question. Remember 
 - Never make claims without evidence
 - State if information is insufficient"""
 
-        # Generate response
-        messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT),
-            HumanMessage(content=user_prompt)
-        ]
+        # Build messages with conversation history
+        messages = [SystemMessage(content=self.SYSTEM_PROMPT)]
+
+        # Add conversation history if available
+        if conversation_history:
+            logger.info(f"🔗 [LLM] Including {len(conversation_history)} previous messages in context for multi-turn conversation")
+            for msg in conversation_history:
+                if msg["role"] == "user":
+                    messages.append(HumanMessage(content=msg["content"]))
+                elif msg["role"] == "assistant":
+                    messages.append(AIMessage(content=msg["content"]))
+        else:
+            logger.info(f"🔗 [LLM] No conversation history - processing as single-turn query")
+
+        # Add current query
+        messages.append(HumanMessage(content=user_prompt))
 
         response = self.llm.invoke(messages)
         answer = response.content
@@ -191,7 +204,8 @@ Based ONLY on the evidence provided above, answer the user's question. Remember 
         self,
         query: str,
         evidence_chunks: List[Chunk],
-        intent: str = "general"
+        intent: str = "general",
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> AsyncIterator[str]:
         """Generate answer with streaming.
 
@@ -199,6 +213,7 @@ Based ONLY on the evidence provided above, answer the user's question. Remember 
             query: User query
             evidence_chunks: Evidence chunks from retrieval
             intent: Query intent for context
+            conversation_history: Previous messages [{"role": "user"|"assistant", "content": "..."}]
 
         Yields:
             Answer chunks as they're generated
@@ -226,11 +241,22 @@ Based ONLY on the evidence provided above, answer the user's question. Remember 
 - Never make claims without evidence
 - State if information is insufficient"""
 
-        # Generate streaming response
-        messages = [
-            SystemMessage(content=self.SYSTEM_PROMPT),
-            HumanMessage(content=user_prompt)
-        ]
+        # Build messages with conversation history
+        messages = [SystemMessage(content=self.SYSTEM_PROMPT)]
+
+        # Add conversation history if available
+        if conversation_history:
+            logger.info(f"🔗 [LLM STREAMING] Including {len(conversation_history)} previous messages in context for multi-turn conversation")
+            for msg in conversation_history:
+                if msg["role"] == "user":
+                    messages.append(HumanMessage(content=msg["content"]))
+                elif msg["role"] == "assistant":
+                    messages.append(AIMessage(content=msg["content"]))
+        else:
+            logger.info(f"🔗 [LLM STREAMING] No conversation history - processing as single-turn query")
+
+        # Add current query
+        messages.append(HumanMessage(content=user_prompt))
 
         async for chunk in self.streaming_llm.astream(messages):
             if hasattr(chunk, 'content') and chunk.content:

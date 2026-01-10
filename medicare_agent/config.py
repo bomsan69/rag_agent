@@ -54,6 +54,14 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0", env="API_HOST")
     api_port: int = Field(default=8000, env="API_PORT")
 
+    # Redis Configuration
+    redis_host: str = Field(default="localhost", env="REDIS_HOST")
+    redis_port: int = Field(default=6379, env="REDIS_PORT")
+    redis_password: str | None = Field(default=None, env="REDIS_PASSWORD")
+    redis_db: int = Field(default=0, env="REDIS_DB")
+    conversation_history_ttl: int = Field(default=1800, env="CONVERSATION_HISTORY_TTL")  # 30 minutes
+    max_conversation_messages: int = Field(default=10, env="MAX_CONVERSATION_MESSAGES")  # Keep last 10 messages
+
     class Config:
         """Pydantic config."""
         env_file = ".env"

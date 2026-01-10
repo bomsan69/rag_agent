@@ -1,12 +1,13 @@
 """Agent orchestrator using LangGraph for RAG pipeline."""
 
-from typing import TypedDict, Annotated, Sequence, AsyncIterator
+from typing import TypedDict, Annotated, Sequence, AsyncIterator, List, Dict, Any
 from langgraph.graph import StateGraph, END
 from medicare_agent.services.retrieval import RetrievalService
 from medicare_agent.services.reranker import RerankerService
 from medicare_agent.services.generator import GeneratorService
 from medicare_agent.services.verifier import VerifierService
 from medicare_agent.services.web_search import WebSearchService
+from medicare_agent.services.conversation_history import ConversationHistoryService
 from medicare_agent.models.schemas import Chunk, Citation, ChatResponse
 from medicare_agent.config import settings
 import logging
@@ -33,6 +34,7 @@ class AgentState(TypedDict):
     issues: list[str]
     needs_revision: bool
     revision_count: int
+    conversation_history: list[Dict[str, str]]
 
 
 class AgentOrchestrator:
@@ -44,7 +46,8 @@ class AgentOrchestrator:
         reranker_service: RerankerService,
         generator_service: GeneratorService,
         verifier_service: VerifierService,
-        web_search_service: WebSearchService = None
+        web_search_service: WebSearchService = None,
+        conversation_history_service: ConversationHistoryService = None
     ):
         """Initialize orchestrator.
 
@@ -54,12 +57,14 @@ class AgentOrchestrator:
             generator_service: Generator service instance
             verifier_service: Verifier service instance
             web_search_service: Web search service instance (optional)
+            conversation_history_service: Conversation history service instance (optional)
         """
         self.retrieval = retrieval_service
         self.reranker = reranker_service
         self.generator = generator_service
         self.verifier = verifier_service
         self.web_search = web_search_service or WebSearchService()
+        self.conversation_history = conversation_history_service or ConversationHistoryService()
         self.graph = self._build_graph()
 
     def _classify_intent(self, state: AgentState) -> AgentState:
@@ -192,10 +197,14 @@ class AgentOrchestrator:
         # Use combined chunks if web search was performed, otherwise use reranked chunks
         evidence_chunks = state.get("combined_chunks") or state["reranked_chunks"]
 
+        # Get conversation history from state
+        conversation_history = state.get("conversation_history", [])
+
         answer, citations = self.generator.generate(
             query=state["query"],
             evidence_chunks=evidence_chunks,
-            intent=state["intent"]
+            intent=state["intent"],
+            conversation_history=conversation_history
         )
 
         state["draft_answer"] = answer
@@ -300,6 +309,17 @@ class AgentOrchestrator:
             ChatResponse with answer and citations
         """
         logger.info(f"Processing query: {query[:100]}...")
+        logger.info(f"Session ID: {session_id[:8]}...")
+
+        # Load conversation history
+        conversation_history = self.conversation_history.get_recent_messages_for_context(session_id)
+        if conversation_history:
+            logger.info(f"💬 Using conversation history: {len(conversation_history)} previous messages loaded from Redis")
+        else:
+            logger.info(f"💬 New conversation: No previous history found")
+
+        # Add current user query to history
+        self.conversation_history.add_message(session_id, "user", query)
 
         # Initial state
         initial_state = AgentState(
@@ -319,7 +339,8 @@ class AgentOrchestrator:
             confidence="medium",
             issues=[],
             needs_revision=False,
-            revision_count=0
+            revision_count=0,
+            conversation_history=conversation_history
         )
 
         # Run graph
@@ -330,6 +351,17 @@ class AgentOrchestrator:
             answer=final_state["final_answer"],
             citations=final_state["citations"],
             confidence=final_state["confidence"]
+        )
+
+        # Add assistant response to history
+        self.conversation_history.add_message(
+            session_id,
+            "assistant",
+            response.answer,
+            metadata={
+                "citations": [c.dict() for c in response.citations],
+                "confidence": response.confidence
+            }
         )
 
         logger.info(f"Query processed. Confidence: {response.confidence}")
@@ -352,6 +384,17 @@ class AgentOrchestrator:
             Answer chunks as they're generated
         """
         logger.info(f"Processing query with streaming: {query[:100]}...")
+        logger.info(f"Session ID: {session_id[:8]}...")
+
+        # Load conversation history
+        conversation_history = self.conversation_history.get_recent_messages_for_context(session_id)
+        if conversation_history:
+            logger.info(f"💬 [STREAMING] Using conversation history: {len(conversation_history)} previous messages loaded from Redis")
+        else:
+            logger.info(f"💬 [STREAMING] New conversation: No previous history found")
+
+        # Add current user query to history
+        self.conversation_history.add_message(session_id, "user", query)
 
         # Run pipeline up to generation (skip verification in streaming mode)
         # Use settings to determine if we should classify/expand
@@ -407,10 +450,18 @@ class AgentOrchestrator:
             logger.info(f"🌐 [STREAMING] Combined {len(reranked)} manual + {len(web_chunks)} web = {len(evidence_chunks)} total chunks")
             logger.info("=" * 80)
 
+        # Accumulate answer for history
+        full_answer = ""
+
         # Stream generation (verification skipped for speed)
         async for chunk in self.generator.generate_stream(
             query=query,
             evidence_chunks=evidence_chunks,
-            intent=intent
+            intent=intent,
+            conversation_history=conversation_history
         ):
+            full_answer += chunk
             yield chunk
+
+        # Add assistant response to history after streaming completes
+        self.conversation_history.add_message(session_id, "assistant", full_answer)

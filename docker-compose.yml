@@ -1,4 +1,21 @@
 services:
+  # Redis Service for conversation history
+  redis:
+    image: redis:7-alpine
+    container_name: medicare-agent-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - medicare-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   # Backend API Service
   backend:
     build:
@@ -7,6 +24,9 @@ services:
     container_name: medicare-agent-backend
     env_file:
       - .env
+    environment:
+      # Override Redis host for Docker environment
+      - REDIS_HOST=redis
     # Docker 내부 네트워크에서만 접근 가능 (외부 인터넷 차단)
     expose:
       - "8000"
@@ -16,6 +36,9 @@ services:
       - ./docs:/app/docs
     networks:
       - medicare-network
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
@@ -53,6 +76,8 @@ networks:
     driver: bridge
 
 volumes:
-  # Named volumes for persistence (optional)
+  # Named volumes for persistence
   data:
   docs:
+  redis-data:
+    driver: local

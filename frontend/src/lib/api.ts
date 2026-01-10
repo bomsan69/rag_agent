@@ -81,6 +81,22 @@ export class ApiClient {
     }
     return response.json();
   }
+
+  async closeSession(sessionId: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${this.baseUrl}/session/close`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to close session: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }
 
 export const apiClient = new ApiClient();

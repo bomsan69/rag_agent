@@ -12,12 +12,15 @@ from medicare_agent.models.schemas import (
     RetrievalResponse,
     VerifyRequest,
     VerifyResponse,
+    SessionCloseRequest,
+    SessionCloseResponse,
     Citation,
 )
 from medicare_agent.services.retrieval import RetrievalService
 from medicare_agent.services.reranker import RerankerService
 from medicare_agent.services.generator import GeneratorService
 from medicare_agent.services.verifier import VerifierService
+from medicare_agent.services.conversation_history import ConversationHistoryService
 from medicare_agent.agents.orchestrator import AgentOrchestrator
 import logging
 
@@ -30,14 +33,15 @@ _retrieval_service: Optional[RetrievalService] = None
 _reranker_service: Optional[RerankerService] = None
 _generator_service: Optional[GeneratorService] = None
 _verifier_service: Optional[VerifierService] = None
+_conversation_history_service: Optional[ConversationHistoryService] = None
 _orchestrator: Optional[AgentOrchestrator] = None
 
 
 def get_services():
     """Dependency to get initialized services."""
-    global _retrieval_service, _reranker_service, _generator_service, _verifier_service, _orchestrator
+    global _retrieval_service, _reranker_service, _generator_service, _verifier_service, _conversation_history_service, _orchestrator
 
-    if not all([_retrieval_service, _reranker_service, _generator_service, _verifier_service, _orchestrator]):
+    if not all([_retrieval_service, _reranker_service, _generator_service, _verifier_service, _conversation_history_service, _orchestrator]):
         raise HTTPException(
             status_code=503,
             detail="Services not initialized. Please wait for startup to complete."
@@ -48,13 +52,14 @@ def get_services():
         "reranker": _reranker_service,
         "generator": _generator_service,
         "verifier": _verifier_service,
+        "conversation_history": _conversation_history_service,
         "orchestrator": _orchestrator,
     }
 
 
 def initialize_services():
     """Initialize all services. Called on app startup."""
-    global _retrieval_service, _reranker_service, _generator_service, _verifier_service, _orchestrator
+    global _retrieval_service, _reranker_service, _generator_service, _verifier_service, _conversation_history_service, _orchestrator
 
     logger.info("Initializing services...")
 
@@ -65,12 +70,14 @@ def initialize_services():
         _reranker_service = RerankerService()
         _generator_service = GeneratorService()
         _verifier_service = VerifierService()
+        _conversation_history_service = ConversationHistoryService()
 
         _orchestrator = AgentOrchestrator(
             retrieval_service=_retrieval_service,
             reranker_service=_reranker_service,
             generator_service=_generator_service,
             verifier_service=_verifier_service,
+            conversation_history_service=_conversation_history_service,
         )
 
         logger.info("Services initialized successfully")
@@ -240,6 +247,47 @@ async def health_check():
             "reranker": _reranker_service is not None,
             "generator": _generator_service is not None,
             "verifier": _verifier_service is not None,
+            "conversation_history": _conversation_history_service is not None,
             "orchestrator": _orchestrator is not None,
         }
     }
+
+
+@router.post("/session/close", response_model=SessionCloseResponse)
+async def close_session(
+    request: SessionCloseRequest,
+    services: dict = Depends(get_services)
+):
+    """Close a chat session and delete conversation history.
+
+    Args:
+        request: Session close request with session_id
+
+    Returns:
+        SessionCloseResponse with success status
+    """
+    logger.info(f"Received session close request for session: {request.session_id}")
+
+    try:
+        conversation_history: ConversationHistoryService = services["conversation_history"]
+
+        # Delete session from Redis
+        success = conversation_history.delete_session(request.session_id)
+
+        if success:
+            return SessionCloseResponse(
+                success=True,
+                message="Session closed successfully",
+                session_id=request.session_id
+            )
+        else:
+            # Still return success even if session didn't exist
+            return SessionCloseResponse(
+                success=True,
+                message="Session not found or already closed",
+                session_id=request.session_id
+            )
+
+    except Exception as e:
+        logger.error(f"Error closing session: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

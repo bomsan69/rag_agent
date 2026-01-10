@@ -24,6 +24,30 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
+  // Close session when user leaves the page or closes the tab
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Use navigator.sendBeacon for more reliable cleanup
+      // This works even when the page is being unloaded
+      const blob = new Blob(
+        [JSON.stringify({ session_id: sessionId })],
+        { type: 'application/json' }
+      );
+      navigator.sendBeacon('/api/session/close', blob);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Cleanup on component unmount
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Also close session when component unmounts
+      apiClient.closeSession(sessionId).catch((err) => {
+        console.error('Failed to close session on unmount:', err);
+      });
+    };
+  }, [sessionId]);
+
   const handleSendMessage = async (content: string) => {
     setError(null);
 
