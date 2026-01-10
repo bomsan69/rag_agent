@@ -239,7 +239,7 @@ Keep the synthesis concise and relevant to the query.
 
         formatted = []
         for chunk in chunks:
-            source_info = chunk.metadata.get("url", chunk.metadata.get("section", "Unknown"))
+            source_info = chunk.metadata.get("url", chunk.metadata.get("section", "2026 Medicare handbook"))
             formatted.append(f"- {chunk.content} (Source: {source_info})")
 
         return "\n".join(formatted)

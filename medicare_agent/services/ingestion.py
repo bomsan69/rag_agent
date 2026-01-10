@@ -203,7 +203,7 @@ class IngestionService:
                         "doc_version": doc_version,
                         "page_start": page_num,
                         "page_end": page_num,
-                        "section": section or "Unknown",
+                        "section": section or "2026 Medicare handbook",
                         "chunk_type": chunk_type,
                         "has_tables": page_data["has_tables"],
                     }

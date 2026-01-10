@@ -86,7 +86,7 @@ Remember: Be helpful, friendly, and clear. Elderly people need simple explanatio
 
         for i, chunk in enumerate(chunks, 1):
             metadata = chunk.metadata
-            section = metadata.get("section", "Unknown")
+            section = metadata.get("section", "2026 Medicare handbook")
             page = metadata.get("page_start", "Unknown")
 
             evidence_parts.append(
@@ -111,7 +111,7 @@ Remember: Be helpful, friendly, and clear. Elderly people need simple explanatio
 
         for chunk in chunks:
             metadata = chunk.metadata
-            section = metadata.get("section", "Unknown")
+            section = metadata.get("section", "2026 Medicare handbook")
             page = metadata.get("page_start", 0)
             doc_version = metadata.get("doc_version", settings.medicare_doc_version)
 
