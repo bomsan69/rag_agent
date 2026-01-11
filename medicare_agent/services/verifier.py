@@ -19,13 +19,21 @@ class VerifierService:
 2. Do not contain unsupported claims, especially numbers/dates
 3. Use conservative, non-definitive language for conditional rules
 4. Properly cite sources
+5. Clearly distinguish between handbook information and general knowledge
 
 Review the draft answer and identify any issues:
 - UNSUPPORTED_CLAIM: Claims not in evidence
 - MISSING_CITATION: Claims without proper citations
+- MISSING_SOURCE_ATTRIBUTION: Uses general knowledge without stating "not in your handbook" or similar
 - DEFINITIVE_LANGUAGE: Too definitive when rules are conditional
 - NUMERIC_ERROR: Numbers/dates not in evidence or misquoted
 - SAFE: No issues found
+
+IMPORTANT: If the answer uses general Medicare knowledge (not from evidence), it MUST explicitly state that.
+Examples of proper attribution:
+✓ "Based on general Medicare information (not in your handbook)..."
+✓ "While your handbook doesn't cover this, generally Medicare..."
+✗ Stating information without indicating whether it's from handbook or general knowledge
 
 Be strict and cautious."""
 
@@ -286,7 +294,7 @@ Revised Answer (fix issues while keeping accurate information and citations):"""
         for issue in issues:
             if "NUMERIC_ERROR" in issue or "UNSUPPORTED_CLAIM" in issue:
                 score -= 30
-            elif "MISSING_CITATION" in issue:
+            elif "MISSING_CITATION" in issue or "MISSING_SOURCE_ATTRIBUTION" in issue:
                 score -= 20
             elif "DEFINITIVE_LANGUAGE" in issue:
                 score -= 10

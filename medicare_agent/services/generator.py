@@ -86,14 +86,28 @@ Remember: Be helpful, friendly, and clear. Elderly people need simple explanatio
 
         for i, chunk in enumerate(chunks, 1):
             metadata = chunk.metadata
-            section = metadata.get("section", "2026 Medicare handbook")
-            page = metadata.get("page_start", "Unknown")
+            source_type = metadata.get("source", "manual")
 
-            evidence_parts.append(
-                f"[Evidence {i}]\n"
-                f"Source: {section} (Page {page})\n"
-                f"Content: {chunk.content}\n"
-            )
+            # Format differently based on source type
+            if source_type == "web_search":
+                # Web search result - include URL and title
+                url = metadata.get("url", "Unknown URL")
+                title = metadata.get("title", "Web Search Result")
+                evidence_parts.append(
+                    f"[Evidence {i} - WEB SOURCE]\n"
+                    f"Source: {title}\n"
+                    f"URL: {url}\n"
+                    f"Content: {chunk.content}\n"
+                )
+            else:
+                # Manual/handbook source - use section and page
+                section = metadata.get("section", "2026 Medicare handbook")
+                page = metadata.get("page_start", "Unknown")
+                evidence_parts.append(
+                    f"[Evidence {i} - HANDBOOK]\n"
+                    f"Source: {section} (Page {page})\n"
+                    f"Content: {chunk.content}\n"
+                )
 
         return "\n".join(evidence_parts)
 
@@ -111,19 +125,29 @@ Remember: Be helpful, friendly, and clear. Elderly people need simple explanatio
 
         for chunk in chunks:
             metadata = chunk.metadata
+            source_type = metadata.get("source", "manual")
             section = metadata.get("section", "2026 Medicare handbook")
             page = metadata.get("page_start", 0)
             doc_version = metadata.get("doc_version", settings.medicare_doc_version)
 
-            # Create unique key to avoid duplicates
-            key = (section, page, doc_version)
+            # For web search results, include URL
+            url = None
+            if source_type == "web_search":
+                url = metadata.get("url")
+                # For web sources, use URL as part of unique key
+                key = (section, url, doc_version)
+            else:
+                # For handbook sources, use section and page
+                key = (section, page, doc_version)
 
             if key not in seen:
                 citations.append(Citation(
                     section=section,
                     page=page,
                     doc_version=doc_version,
-                    chunk_id=chunk.chunk_id
+                    chunk_id=chunk.chunk_id,
+                    url=url,
+                    source_type=source_type
                 ))
                 seen.add(key)
 
@@ -164,14 +188,28 @@ Remember: Be helpful, friendly, and clear. Elderly people need simple explanatio
 
 Intent: {intent}
 
-Evidence from Medicare Handbook 2026:
+Evidence (includes Medicare Handbook 2026 and Web Search Results):
 {evidence_text}
 
-Based ONLY on the evidence provided above, answer the user's question. Remember to:
-- Cite sources using [Section > Page X] format
-- Use conservative language
-- Never make claims without evidence
-- State if information is insufficient"""
+Answer the user's question following these rules:
+
+1. **PRIORITIZE evidence above** - use it whenever available
+
+2. **CITE sources based on evidence type**:
+   - HANDBOOK evidence → Cite as: "According to your Medicare Handbook [Page X]..."
+   - WEB SOURCE evidence → Cite as: "According to [source title/website]..." and mention it's from web research
+   - Your own knowledge (when evidence is insufficient) → State clearly: "Based on general Medicare information (not in your handbook or web sources)..."
+
+3. **Source attribution examples**:
+   ✓ "According to your Medicare Handbook [Page 27], Part B late enrollment..."
+   ✓ "According to Medicare.gov (web source), providers in California..."
+   ✓ "Based on general Medicare information (not in your handbook), typical enrollment..."
+   ✗ DO NOT use web sources without attribution
+   ✗ DO NOT mix sources without indicating which is which
+
+4. **Use simple, friendly language** for elderly audience (60+)
+
+5. **Be helpful and complete** - don't refuse to answer unless truly unable"""
 
         # Build messages with conversation history
         messages = [SystemMessage(content=self.SYSTEM_PROMPT)]
@@ -232,14 +270,28 @@ Based ONLY on the evidence provided above, answer the user's question. Remember 
 
 Intent: {intent}
 
-Evidence from Medicare Handbook 2026:
+Evidence (includes Medicare Handbook 2026 and Web Search Results):
 {evidence_text}
 
-Based ONLY on the evidence provided above, answer the user's question. Remember to:
-- Cite sources using [Section > Page X] format
-- Use conservative language
-- Never make claims without evidence
-- State if information is insufficient"""
+Answer the user's question following these rules:
+
+1. **PRIORITIZE evidence above** - use it whenever available
+
+2. **CITE sources based on evidence type**:
+   - HANDBOOK evidence → Cite as: "According to your Medicare Handbook [Page X]..."
+   - WEB SOURCE evidence → Cite as: "According to [source title/website]..." and mention it's from web research
+   - Your own knowledge (when evidence is insufficient) → State clearly: "Based on general Medicare information (not in your handbook or web sources)..."
+
+3. **Source attribution examples**:
+   ✓ "According to your Medicare Handbook [Page 27], Part B late enrollment..."
+   ✓ "According to Medicare.gov (web source), providers in California..."
+   ✓ "Based on general Medicare information (not in your handbook), typical enrollment..."
+   ✗ DO NOT use web sources without attribution
+   ✗ DO NOT mix sources without indicating which is which
+
+4. **Use simple, friendly language** for elderly audience (60+)
+
+5. **Be helpful and complete** - don't refuse to answer unless truly unable"""
 
         # Build messages with conversation history
         messages = [SystemMessage(content=self.SYSTEM_PROMPT)]

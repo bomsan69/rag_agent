@@ -360,9 +360,18 @@ class AgentOrchestrator:
         # Run graph
         final_state = self.graph.invoke(initial_state)
 
+        # Add low confidence warning if needed
+        final_answer = final_state["final_answer"]
+        if final_state["confidence"] == "low":
+            warning = (
+                "⚠️ **Low Confidence Warning**: The information below may be incomplete or based on limited evidence. "
+                "Please verify with official Medicare resources if making important decisions.\n\n"
+            )
+            final_answer = warning + final_answer
+
         # Build response
         response = ChatResponse(
-            answer=final_state["final_answer"],
+            answer=final_answer,
             citations=final_state["citations"],
             confidence=final_state["confidence"]
         )

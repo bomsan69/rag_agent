@@ -10,6 +10,8 @@ class Citation(BaseModel):
     page: int = Field(..., description="Page number")
     doc_version: str = Field(..., description="Document version")
     chunk_id: Optional[str] = Field(None, description="Internal chunk identifier")
+    url: Optional[str] = Field(None, description="URL for web search results")
+    source_type: Optional[str] = Field(None, description="Source type: 'handbook' or 'web_search'")
 
 
 class ChatRequest(BaseModel):
