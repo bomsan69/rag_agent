@@ -158,17 +158,31 @@ class AgentOrchestrator:
         logger.info("=" * 80)
 
         query = state["query"]
+        intent = state["intent"]
         logger.info(f"🌐 [WEB SEARCH NODE] Searching the web for: {query}")
 
+        # Get raw web search results
         web_chunks = self.web_search.search(query)
+        logger.info(f"🌐 [WEB SEARCH NODE] Raw web search returned {len(web_chunks)} chunks")
 
-        state["web_search_chunks"] = web_chunks
+        # Rerank web search results to select most relevant ones
+        if web_chunks:
+            logger.info(f"🌐 [WEB SEARCH NODE] Reranking web search results...")
+            reranked_web_chunks = self.reranker.select_best_evidence(
+                query=query,
+                chunks=web_chunks,
+                intent=intent
+            )
+            logger.info(f"🌐 [WEB SEARCH NODE] Reranked to {len(reranked_web_chunks)} high-quality web chunks")
+            state["web_search_chunks"] = reranked_web_chunks
+        else:
+            logger.info(f"🌐 [WEB SEARCH NODE] No web results to rerank")
+            state["web_search_chunks"] = []
 
-        # Combine manual chunks with web search results
-        state["combined_chunks"] = state["reranked_chunks"] + web_chunks
+        # Combine manual chunks with reranked web search results
+        state["combined_chunks"] = state["reranked_chunks"] + state["web_search_chunks"]
 
-        logger.info(f"🌐 [WEB SEARCH NODE] Web search returned {len(web_chunks)} chunks")
-        logger.info(f"🌐 [WEB SEARCH NODE] Combined {len(state['reranked_chunks'])} manual chunks + {len(web_chunks)} web chunks")
+        logger.info(f"🌐 [WEB SEARCH NODE] Combined {len(state['reranked_chunks'])} manual chunks + {len(state['web_search_chunks'])} reranked web chunks")
         logger.info(f"🌐 [WEB SEARCH NODE] Total chunks for generation: {len(state['combined_chunks'])}")
         logger.info("=" * 80)
         return state
@@ -445,9 +459,25 @@ class AgentOrchestrator:
             logger.info("=" * 80)
             logger.info("🌐 [STREAMING] EXECUTING WEB SEARCH")
             logger.info("=" * 80)
+
+            # Get raw web search results
             web_chunks = self.web_search.search(query)
-            evidence_chunks = reranked + web_chunks
-            logger.info(f"🌐 [STREAMING] Combined {len(reranked)} manual + {len(web_chunks)} web = {len(evidence_chunks)} total chunks")
+            logger.info(f"🌐 [STREAMING] Raw web search returned {len(web_chunks)} chunks")
+
+            # Rerank web search results
+            if web_chunks:
+                logger.info(f"🌐 [STREAMING] Reranking web search results...")
+                reranked_web_chunks = self.reranker.select_best_evidence(
+                    query=query,
+                    chunks=web_chunks,
+                    intent=intent
+                )
+                logger.info(f"🌐 [STREAMING] Reranked to {len(reranked_web_chunks)} high-quality web chunks")
+                evidence_chunks = reranked + reranked_web_chunks
+            else:
+                evidence_chunks = reranked
+
+            logger.info(f"🌐 [STREAMING] Combined {len(reranked)} manual + {len(evidence_chunks) - len(reranked)} reranked web = {len(evidence_chunks)} total chunks")
             logger.info("=" * 80)
 
         # Accumulate answer for history
