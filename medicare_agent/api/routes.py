@@ -22,6 +22,7 @@ from medicare_agent.services.generator import GeneratorService
 from medicare_agent.services.verifier import VerifierService
 from medicare_agent.services.conversation_history import ConversationHistoryService
 from medicare_agent.agents.orchestrator import AgentOrchestrator
+from medicare_agent.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,7 +71,13 @@ def initialize_services():
         _reranker_service = RerankerService()
         _generator_service = GeneratorService()
         _verifier_service = VerifierService()
-        _conversation_history_service = ConversationHistoryService()
+
+        # Initialize conversation history with config settings
+        use_memory = settings.checkpoint_type.lower() == "memory"
+        _conversation_history_service = ConversationHistoryService(
+            checkpoint_path=settings.checkpoint_path,
+            use_memory=use_memory
+        )
 
         _orchestrator = AgentOrchestrator(
             retrieval_service=_retrieval_service,

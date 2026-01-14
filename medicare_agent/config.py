@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # Application Configuration
     app_env: str = Field(default="development", env="APP_ENV")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    log_dir: str = Field(default="./logs", env="LOG_DIR")
 
     # Document Configuration
     medicare_doc_version: str = Field(default="2026", env="MEDICARE_DOC_VERSION")
@@ -54,19 +55,29 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0", env="API_HOST")
     api_port: int = Field(default=8000, env="API_PORT")
 
-    # Redis Configuration
-    redis_host: str = Field(default="localhost", env="REDIS_HOST")
-    redis_port: int = Field(default=6379, env="REDIS_PORT")
-    redis_password: str | None = Field(default=None, env="REDIS_PASSWORD")
-    redis_db: int = Field(default=0, env="REDIS_DB")
-    conversation_history_ttl: int = Field(default=1800, env="CONVERSATION_HISTORY_TTL")  # 30 minutes
+    # Conversation History Configuration (LangGraph Checkpoint)
+    # Use "memory" for development (not persistent) or "sqlite" for production (persistent)
+    checkpoint_type: str = Field(default="memory", env="CHECKPOINT_TYPE")  # "memory" or "sqlite"
+    checkpoint_path: str = Field(
+        default="./data/checkpoints/conversations.db",
+        env="CHECKPOINT_PATH"
+    )
     max_conversation_messages: int = Field(default=10, env="MAX_CONVERSATION_MESSAGES")  # Keep last 10 messages
+
+    # Legacy Redis Configuration (DEPRECATED - kept for backward compatibility)
+    # These settings are no longer used. Use CHECKPOINT_TYPE and CHECKPOINT_PATH instead.
+    # redis_host: str = Field(default="localhost", env="REDIS_HOST")
+    # redis_port: int = Field(default=6379, env="REDIS_PORT")
+    # redis_password: str | None = Field(default=None, env="REDIS_PASSWORD")
+    # redis_db: int = Field(default=0, env="REDIS_DB")
+    # conversation_history_ttl: int = Field(default=1800, env="CONVERSATION_HISTORY_TTL")
 
     class Config:
         """Pydantic config."""
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra fields (for backward compatibility with legacy Redis settings)
 
 
 # Global settings instance

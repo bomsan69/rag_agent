@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     # Startup
-    setup_logging(settings.log_level)
+    setup_logging(settings.log_level, settings.log_dir)
     logger.info("Starting Medicare AI Chatbot...")
     logger.info(f"Environment: {settings.app_env}")
     logger.info(f"OpenAI Model: {settings.openai_model}")

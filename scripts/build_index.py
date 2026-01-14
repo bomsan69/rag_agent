@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Build index from Medicare PDF."""
-    setup_logging(settings.log_level)
+    setup_logging(settings.log_level, settings.log_dir)
     logger.info("=" * 80)
     logger.info("Medicare AI Chatbot - Index Builder")
     logger.info("=" * 80)

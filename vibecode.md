@@ -54,3 +54,15 @@
   이렇게 하면 비용과 성능의 균형을 맞출 수 있습니다.
 
   구체적인 구현을 원하시면 말씀해주세요!
+
+   프로덕션 전환 시
+
+  영구 저장이 필요하면:
+  pip install langgraph-checkpoint-sqlite
+
+  # SqliteSaver 사용 (프로덕션용)
+  service = ConversationHistoryService(use_memory=False)
+
+  파일 위치
+
+  - medicare_agent/services/conversation_history.py:1 - 전체 재구현 완료

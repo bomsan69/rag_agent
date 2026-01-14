@@ -1,45 +1,153 @@
-"""Conversation history management using Redis."""
+"""Conversation history management using LangGraph checkpoint."""
 
-import json
 import logging
-from typing import List, Dict, Any, Optional
-import redis
-from redis.exceptions import RedisError
+from typing import List, Dict, Any, Optional, TypedDict
+from pathlib import Path
+
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import StateGraph, END
 
 from medicare_agent.config import settings
 
 logger = logging.getLogger(__name__)
 
 
+class ConversationState(TypedDict):
+    """State for conversation history."""
+    messages: List[BaseMessage]
+
+
 class ConversationHistoryService:
-    """Manages conversation history storage and retrieval using Redis."""
+    """Manages conversation history storage and retrieval using LangGraph checkpoint."""
 
-    def __init__(self):
-        """Initialize Redis connection."""
+    def __init__(self, checkpoint_path: Optional[str] = None, use_memory: bool = True):
+        """Initialize LangGraph checkpoint.
+
+        Args:
+            checkpoint_path: Path to SQLite checkpoint database (if use_memory=False).
+                           Defaults to './data/checkpoints/conversations.db'
+            use_memory: If True, use MemorySaver (in-memory, not persistent).
+                       If False, use SqliteSaver (requires langgraph-checkpoint-sqlite).
+                       Default: True
+        """
         try:
-            self.redis_client = redis.Redis(
-                host=settings.redis_host,
-                port=settings.redis_port,
-                password=settings.redis_password if settings.redis_password else None,
-                db=settings.redis_db,
-                decode_responses=True,
-                socket_connect_timeout=5,
-                socket_timeout=5,
-            )
-            # Test connection
-            self.redis_client.ping()
-            logger.info(
-                f"✓ Redis connection established: {settings.redis_host}:{settings.redis_port} (db={settings.redis_db})"
-            )
-            logger.info(f"✓ Conversation history persistence: ENABLED (TTL={settings.conversation_history_ttl}s, max_messages={settings.max_conversation_messages})")
-        except RedisError as e:
-            logger.error(f"✗ Failed to connect to Redis: {e}")
-            logger.warning("⚠ Conversation history will NOT be persisted - running in stateless mode")
-            self.redis_client = None
+            if use_memory:
+                # Use in-memory checkpoint (not persistent across restarts)
+                # Good for development and testing
+                self.checkpointer = MemorySaver()
+                self.sqlite_conn = None
+                logger.info("✓ LangGraph checkpoint initialized: In-Memory Storage")
+                logger.warning("⚠ Using MemorySaver - conversations will NOT persist across restarts")
+            else:
+                # Use SQLite checkpoint (persistent)
+                # Requires: pip install langgraph-checkpoint-sqlite
+                if checkpoint_path is None:
+                    checkpoint_path = "./data/checkpoints/conversations.db"
 
-    def _get_key(self, session_id: str) -> str:
-        """Generate Redis key for a session."""
-        return f"conversation:{session_id}"
+                # Ensure directory exists
+                db_path = Path(checkpoint_path)
+                db_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # NOTE: This requires langgraph-checkpoint-sqlite to be installed
+                try:
+                    import sqlite3
+                    from langgraph.checkpoint.sqlite import SqliteSaver
+
+                    # Create SQLite connection
+                    self.sqlite_conn = sqlite3.connect(str(db_path), check_same_thread=False)
+                    self.checkpointer = SqliteSaver(self.sqlite_conn)
+
+                    # Initialize checkpoint tables
+                    self.checkpointer.setup()
+
+                    logger.info(f"✓ LangGraph checkpoint initialized: SQLite Storage ({checkpoint_path})")
+                except ImportError:
+                    logger.error("✗ SqliteSaver not available. Install with: uv pip install langgraph-checkpoint-sqlite")
+                    logger.info("ℹ Falling back to MemorySaver")
+                    self.checkpointer = MemorySaver()
+                    self.sqlite_conn = None
+
+            # Build a simple graph for message storage
+            self._build_graph()
+
+            logger.info(
+                f"✓ Conversation history persistence: ENABLED "
+                f"(max_messages={settings.max_conversation_messages})"
+            )
+        except Exception as e:
+            logger.error(f"✗ Failed to initialize checkpoint: {e}")
+            logger.warning("⚠ Conversation history will NOT be persisted - running in stateless mode")
+            self.checkpointer = None
+            self.graph = None
+
+    def _build_graph(self):
+        """Build a simple graph for message management."""
+
+        def store_messages(state: ConversationState) -> ConversationState:
+            """Simply return the state (messages are stored by checkpoint)."""
+            return state
+
+        workflow = StateGraph(ConversationState)
+        workflow.add_node("store", store_messages)
+        workflow.set_entry_point("store")
+        workflow.add_edge("store", END)
+
+        self.graph = workflow.compile(checkpointer=self.checkpointer)
+
+    def _get_thread_config(self, session_id: str) -> Dict[str, Any]:
+        """Get LangGraph thread configuration for a session.
+
+        Args:
+            session_id: Unique session identifier
+
+        Returns:
+            Thread configuration dictionary
+        """
+        return {"configurable": {"thread_id": session_id}}
+
+    def _message_to_langchain(self, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> BaseMessage:
+        """Convert message dict to LangChain message object.
+
+        Args:
+            role: Message role ("user" or "assistant")
+            content: Message content
+            metadata: Optional metadata
+
+        Returns:
+            LangChain message object
+        """
+        additional_kwargs = {"metadata": metadata} if metadata else {}
+
+        if role == "user":
+            return HumanMessage(content=content, additional_kwargs=additional_kwargs)
+        elif role == "assistant":
+            return AIMessage(content=content, additional_kwargs=additional_kwargs)
+        else:
+            raise ValueError(f"Unknown role: {role}")
+
+    def _langchain_message_to_dict(self, message: BaseMessage) -> Dict[str, Any]:
+        """Convert LangChain message to dictionary format.
+
+        Args:
+            message: LangChain message object
+
+        Returns:
+            Message dictionary
+        """
+        role = "user" if isinstance(message, HumanMessage) else "assistant"
+        result = {
+            "role": role,
+            "content": message.content,
+        }
+
+        # Extract metadata if exists
+        if hasattr(message, 'additional_kwargs') and message.additional_kwargs:
+            metadata = message.additional_kwargs.get('metadata')
+            if metadata:
+                result["metadata"] = metadata
+
+        return result
 
     def add_message(
         self, session_id: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None
@@ -56,45 +164,65 @@ class ConversationHistoryService:
         Returns:
             True if successful, False otherwise
         """
-        if not self.redis_client:
+        if not self.checkpointer or not self.graph:
             return False
 
         try:
-            key = self._get_key(session_id)
-            message = {
-                "role": role,
-                "content": content,
-            }
-            if metadata:
-                message["metadata"] = metadata
+            # Get current messages
+            current_messages = self._get_messages_from_checkpoint(session_id)
 
-            # Get current history
-            history = self.get_history(session_id, limit=None)
-            history.append(message)
+            # Add new message
+            new_message = self._message_to_langchain(role, content, metadata)
+            current_messages.append(new_message)
 
-            # Keep only recent messages to limit memory usage
-            if len(history) > settings.max_conversation_messages * 2:
-                # Keep last N turns (N user + N assistant messages)
-                history = history[-(settings.max_conversation_messages * 2):]
+            # Trim messages using LangChain's trim_messages
+            # Keep last N messages (both user and assistant)
+            max_messages = settings.max_conversation_messages * 2
+            if len(current_messages) > max_messages:
+                # Simple slice-based trimming (most reliable)
+                current_messages = current_messages[-max_messages:]
 
-            # Save to Redis
-            self.redis_client.setex(
-                key,
-                settings.conversation_history_ttl,
-                json.dumps(history, ensure_ascii=False)
-            )
+            # Save to checkpoint using graph invoke
+            config = self._get_thread_config(session_id)
+            state = ConversationState(messages=current_messages)
+            self.graph.invoke(state, config)
+
             logger.info(
-                f"📝 [REDIS] Saved {role} message to session {session_id[:8]}... "
-                f"(total: {len(history)} messages, {len(content[:100])}... chars)"
+                f"📝 [CHECKPOINT] Saved {role} message to session {session_id[:8]}... "
+                f"(total: {len(current_messages)} messages, {len(content[:100])}... chars)"
             )
             return True
 
-        except RedisError as e:
-            logger.error(f"Failed to add message to Redis: {e}")
-            return False
         except Exception as e:
-            logger.error(f"Unexpected error adding message: {e}")
+            logger.error(f"Failed to add message to checkpoint: {e}", exc_info=True)
             return False
+
+    def _get_messages_from_checkpoint(self, session_id: str) -> List[BaseMessage]:
+        """Get messages from checkpoint storage.
+
+        Args:
+            session_id: Unique session identifier
+
+        Returns:
+            List of LangChain message objects
+        """
+        if not self.checkpointer or not self.graph:
+            return []
+
+        try:
+            config = self._get_thread_config(session_id)
+
+            # Get state from checkpoint
+            state = self.graph.get_state(config)
+
+            if state and state.values and "messages" in state.values:
+                return state.values["messages"]
+
+            return []
+
+        except Exception as e:
+            logger.error(f"Failed to get messages from checkpoint: {e}")
+            return []
 
     def get_history(
         self, session_id: str, limit: Optional[int] = None
@@ -109,32 +237,23 @@ class ConversationHistoryService:
         Returns:
             List of message dictionaries
         """
-        if not self.redis_client:
+        if not self.checkpointer:
             return []
 
         try:
-            key = self._get_key(session_id)
-            data = self.redis_client.get(key)
+            messages = self._get_messages_from_checkpoint(session_id)
 
-            if not data:
-                return []
-
-            history = json.loads(data)
+            # Convert to dict format
+            history = [self._langchain_message_to_dict(msg) for msg in messages]
 
             # Apply limit if specified
             if limit is not None and limit > 0:
                 history = history[-limit:]
 
             if history:
-                logger.info(f"📖 [REDIS] Retrieved {len(history)} messages for session {session_id[:8]}...")
+                logger.info(f"📖 [CHECKPOINT] Retrieved {len(history)} messages for session {session_id[:8]}...")
             return history
 
-        except RedisError as e:
-            logger.error(f"Failed to get history from Redis: {e}")
-            return []
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to decode history JSON: {e}")
-            return []
         except Exception as e:
             logger.error(f"Unexpected error getting history: {e}")
             return []
@@ -145,6 +264,8 @@ class ConversationHistoryService:
         """
         Get recent messages formatted for LLM context.
 
+        Uses LangChain's trim_messages to intelligently manage conversation window.
+
         Args:
             session_id: Unique session identifier
             max_messages: Maximum number of recent messages (defaults to config)
@@ -152,16 +273,33 @@ class ConversationHistoryService:
         Returns:
             List of {"role": str, "content": str} dictionaries
         """
-        if max_messages is None:
-            max_messages = settings.max_conversation_messages
+        if not self.checkpointer:
+            return []
 
-        history = self.get_history(session_id, limit=max_messages)
+        try:
+            if max_messages is None:
+                max_messages = settings.max_conversation_messages
 
-        # Return only role and content for LLM context
-        return [
-            {"role": msg["role"], "content": msg["content"]}
-            for msg in history
-        ]
+            # Get all messages
+            messages = self._get_messages_from_checkpoint(session_id)
+
+            if not messages:
+                return []
+
+            # Use trim_messages to keep only recent messages
+            # This ensures we maintain conversation coherence
+            trimmed_messages = messages[-max_messages:] if len(messages) > max_messages else messages
+
+            # Convert to simple dict format for LLM context
+            return [
+                {"role": "user" if isinstance(msg, HumanMessage) else "assistant",
+                 "content": msg.content}
+                for msg in trimmed_messages
+            ]
+
+        except Exception as e:
+            logger.error(f"Unexpected error getting recent messages: {e}")
+            return []
 
     def delete_session(self, session_id: str) -> bool:
         """
@@ -173,28 +311,32 @@ class ConversationHistoryService:
         Returns:
             True if successful, False otherwise
         """
-        if not self.redis_client:
+        if not self.checkpointer or not self.graph:
             return False
 
         try:
-            key = self._get_key(session_id)
-            deleted = self.redis_client.delete(key)
-            if deleted > 0:
-                logger.info(f"🗑️  [REDIS] Deleted session {session_id[:8]}... (conversation history cleared)")
+            config = self._get_thread_config(session_id)
+
+            # Check if session exists first
+            messages = self._get_messages_from_checkpoint(session_id)
+
+            if messages:
+                # Save an empty state
+                empty_state = ConversationState(messages=[])
+                self.graph.invoke(empty_state, config)
+                logger.info(f"🗑️  [CHECKPOINT] Deleted session {session_id[:8]}... (conversation history cleared)")
             else:
-                logger.debug(f"[REDIS] Session {session_id[:8]}... not found (already expired or never existed)")
+                logger.debug(f"[CHECKPOINT] Session {session_id[:8]}... not found (never existed)")
+
             return True
 
-        except RedisError as e:
-            logger.error(f"Failed to delete session from Redis: {e}")
-            return False
         except Exception as e:
-            logger.error(f"Unexpected error deleting session: {e}")
+            logger.error(f"Failed to delete session from checkpoint: {e}")
             return False
 
     def session_exists(self, session_id: str) -> bool:
         """
-        Check if a session exists in Redis.
+        Check if a session exists in checkpoint.
 
         Args:
             session_id: Unique session identifier
@@ -202,45 +344,25 @@ class ConversationHistoryService:
         Returns:
             True if session exists, False otherwise
         """
-        if not self.redis_client:
+        if not self.checkpointer:
             return False
 
         try:
-            key = self._get_key(session_id)
-            return self.redis_client.exists(key) > 0
-        except RedisError as e:
+            messages = self._get_messages_from_checkpoint(session_id)
+            return len(messages) > 0
+        except Exception as e:
             logger.error(f"Failed to check session existence: {e}")
             return False
 
-    def refresh_ttl(self, session_id: str) -> bool:
-        """
-        Refresh TTL for a session (extend expiration time).
-
-        Args:
-            session_id: Unique session identifier
-
-        Returns:
-            True if successful, False otherwise
-        """
-        if not self.redis_client:
-            return False
-
-        try:
-            key = self._get_key(session_id)
-            if self.redis_client.exists(key):
-                self.redis_client.expire(key, settings.conversation_history_ttl)
-                logger.debug(f"Refreshed TTL for session {session_id}")
-                return True
-            return False
-        except RedisError as e:
-            logger.error(f"Failed to refresh TTL: {e}")
-            return False
-
     def close(self):
-        """Close Redis connection."""
-        if self.redis_client:
+        """Close checkpoint connection."""
+        if self.checkpointer:
             try:
-                self.redis_client.close()
-                logger.info("Redis connection closed")
+                # Close SQLite connection if it exists
+                if hasattr(self, 'sqlite_conn') and self.sqlite_conn:
+                    self.sqlite_conn.close()
+                    logger.info("SQLite checkpoint connection closed")
+                else:
+                    logger.info("Checkpoint connection closed")
             except Exception as e:
-                logger.error(f"Error closing Redis connection: {e}")
+                logger.error(f"Error closing checkpoint connection: {e}")

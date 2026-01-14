@@ -8,6 +8,32 @@ interface MessageBubbleProps {
   message: Message;
 }
 
+// URL을 링크로 변환하는 함수
+function linkifyContent(text: string): React.ReactNode[] {
+  // split용 정규식 (캡처 그룹으로 URL도 결과에 포함)
+  const splitRegex = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"」』】》>])/g;
+  const parts = text.split(splitRegex);
+
+  return parts.map((part, index) => {
+    // URL 체크용 정규식 (g 플래그 없이 사용)
+    const isUrl = /^https?:\/\//.test(part);
+    if (isUrl) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 underline break-all"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
 export default function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
@@ -63,7 +89,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
         >
           <div className="prose prose-sm max-w-none">
             <p className="whitespace-pre-wrap leading-relaxed">
-              {message.content}
+              {linkifyContent(message.content)}
             </p>
           </div>
 
