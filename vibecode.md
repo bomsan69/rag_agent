@@ -66,3 +66,24 @@
   파일 위치
 
   - medicare_agent/services/conversation_history.py:1 - 전체 재구현 완료
+
+
+
+# 여래개의 llm을 선택적으로 사용할 수 있는 기능을 추가해 주세요
+- 현재는 openai와 openrouter,self hosted llm 3개 입니다.
+- llm 부분을 별도의 함수로 만들어서 사용하는 방법을 고려해 주세요
+- 모델선택은 env파일에서 RUNN_MODEL 값을 설정해서 사용하는 방법을 검토해 주세요
+
+## self hosted llm 서버 
+- self hosted llm 모델은 vLLM기반으로 운영중인 Qwen/Qwen2.5-14B-Instruct입니다.
+- base_url=http://openai.aifreechatbot.com/v1
+- api_key는 env 파일에 VLLM_API_KEY에 저장되어 있습니다.
+- 아래 경로에 예저 코드가 포함되어 있습니다.
+  /Users/jeahyungchung/Project/AI/langgraph/27_RedisMemory_vllm.py
+
+## openrouter
+- based_url=https://openrouter.ai/api/v1
+- model=wen/qwen-2.5-72b-instruct
+- api_key는 env파일의 OPENROUTE_API_KEY
+- 아래 경로에 예저 코드가 포함되어 있습니다.
+  /Users/jeahyungchung/Project/AI/langgraph/basic_openrouter.py

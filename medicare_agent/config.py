@@ -1,5 +1,6 @@
 """Configuration management for Medicare AI Chatbot."""
 
+from typing import Literal
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
@@ -7,12 +8,35 @@ from pydantic import Field
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
+    # LLM Provider Selection: "openai" | "openrouter" | "vllm"
+    run_model: Literal["openai", "openrouter", "vllm"] = Field(
+        default="openai", env="RUN_MODEL"
+    )
+
     # OpenAI Configuration
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4-turbo-preview", env="OPENAI_MODEL")
     openai_embedding_model: str = Field(
         default="text-embedding-3-large",
         env="OPENAI_EMBEDDING_MODEL"
+    )
+
+    # vLLM (Self-hosted) Configuration
+    vllm_api_key: str = Field(default="", env="VLLM_API_KEY")
+    vllm_base_url: str = Field(
+        default="http://openai.aifreechatbot.com/v1", env="VLLM_BASE_URL"
+    )
+    vllm_model: str = Field(
+        default="Qwen/Qwen2.5-14B-Instruct", env="VLLM_MODEL"
+    )
+
+    # OpenRouter Configuration
+    openrouter_api_key: str = Field(default="", env="OPENROUTER_API_KEY")
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1", env="OPENROUTER_BASE_URL"
+    )
+    openrouter_model: str = Field(
+        default="qwen/qwen-2.5-72b-instruct", env="OPENROUTER_MODEL"
     )
 
     # Tavily Search Configuration

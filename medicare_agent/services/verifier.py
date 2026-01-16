@@ -2,10 +2,10 @@
 
 import re
 from typing import List, Tuple, Literal
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from medicare_agent.config import settings
 from medicare_agent.models.schemas import Citation, Chunk
+from medicare_agent.utils.llm import get_llm, get_current_provider, get_current_model_name
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,11 +39,8 @@ Be strict and cautious."""
 
     def __init__(self):
         """Initialize verifier service."""
-        self.llm = ChatOpenAI(
-            model="gpt-4-turbo-preview",
-            temperature=0,
-            openai_api_key=settings.openai_api_key
-        )
+        logger.info(f"Initializing VerifierService with provider: {get_current_provider()}, model: {get_current_model_name()}")
+        self.llm = get_llm(streaming=False, temperature=0)
 
     def verify(
         self,

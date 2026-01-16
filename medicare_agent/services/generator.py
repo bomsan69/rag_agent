@@ -1,10 +1,10 @@
 """Answer generation service with citation enforcement."""
 
 from typing import List, Tuple, AsyncIterator, Dict, Any, Optional
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from medicare_agent.config import settings
 from medicare_agent.models.schemas import Chunk, Citation
+from medicare_agent.utils.llm import get_llm, get_fast_llm, get_current_provider, get_current_model_name
 import logging
 
 logger = logging.getLogger(__name__)
@@ -55,23 +55,10 @@ Remember: Be helpful, friendly, and clear. Elderly people need simple explanatio
 
     def __init__(self):
         """Initialize generator service."""
-        self.llm = ChatOpenAI(
-            model=settings.openai_model,
-            temperature=0,
-            openai_api_key=settings.openai_api_key
-        )
-        self.streaming_llm = ChatOpenAI(
-            model=settings.openai_model,
-            temperature=0,
-            openai_api_key=settings.openai_api_key,
-            streaming=True
-        )
-        # Fast model for classification and expansion
-        self.fast_llm = ChatOpenAI(
-            model=settings.fast_model if settings.use_fast_model_for_classification else settings.openai_model,
-            temperature=0,
-            openai_api_key=settings.openai_api_key
-        ) if settings.use_fast_model_for_classification else self.llm
+        logger.info(f"Initializing GeneratorService with provider: {get_current_provider()}, model: {get_current_model_name()}")
+        self.llm = get_llm(streaming=False, temperature=0)
+        self.streaming_llm = get_llm(streaming=True, temperature=0)
+        self.fast_llm = get_fast_llm(temperature=0)
 
     def _format_evidence(self, chunks: List[Chunk]) -> str:
         """Format evidence chunks for prompt.
