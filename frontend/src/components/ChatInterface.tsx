@@ -128,7 +128,7 @@ export default function ChatInterface() {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <span className="text-3xl">🏥</span>
+                <span className="text-2xl">AABHF</span>
                 Medicare AI Assistant
               </h1>
               <p className="text-sm text-gray-600 mt-1">
@@ -158,15 +158,14 @@ export default function ChatInterface() {
           <div className="mx-auto">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mb-4">
+              {/* <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mb-4">
                 <span className="text-4xl">💬</span>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              </div> */}
+              {/* <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 Medicare 도우미에 오신 것을 환영합니다
-              </h2>
+              </h2> */}
               <p className="text-gray-600 max-w-md mb-6 text-base leading-relaxed">
                 Medicare에 대해 궁금하신 것을 편하게 물어보세요.
-                쉽게 설명해 드리겠습니다.
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mb-4">
                 <p className="text-sm text-blue-900 leading-relaxed">
@@ -184,6 +183,28 @@ export default function ChatInterface() {
                   <strong>English</strong>나 <strong>한국어</strong>로 질문하시면
                   같은 언어로 답변해 드립니다!
                 </p>
+              </div>
+
+              {/* Example Questions */}
+              <div className="mt-6 w-full max-w-md">
+                <p className="text-xs text-gray-500 mb-3 text-center">이런 질문을 해보세요:</p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    "Part B에 늦게 가입하면 벌금이 있나요?",
+                    "Medicare는 언제 신청할 수 있나요?",
+                    "What happens if I sign up for Medicare late?",
+                    "When should I apply for Medicare?",
+                  ].map((question, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSendMessage(question)}
+                      disabled={isLoading}
+                      className="text-sm px-4 py-2.5 bg-white border border-gray-200 hover:border-primary-300 hover:bg-primary-50 text-gray-700 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left shadow-sm"
+                    >
+                      {question}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (

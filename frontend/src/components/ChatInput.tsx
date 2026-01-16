@@ -37,34 +37,8 @@ export default function ChatInput({ onSend, disabled = false, isLoading = false 
     }
   }, [input]);
 
-  const exampleQuestions = [
-    "Part B에 늦게 가입하면 벌금이 있나요?",
-    "Medicare는 언제 신청할 수 있나요?",
-    "What happens if I sign up for Medicare late?",
-    "When should I apply for Medicare?",
-  ];
-
   return (
     <div className="border-t border-gray-200 bg-white">
-      {/* Example Questions - only show when input is empty */}
-      {!input && (
-        <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-xs text-gray-500 mb-2">Try asking:</p>
-          <div className="flex flex-wrap gap-2">
-            {exampleQuestions.map((question, index) => (
-              <button
-                key={index}
-                onClick={() => setInput(question)}
-                disabled={disabled || isLoading}
-                className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {question}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Input Area */}
       <div className="px-4 py-4">
         <div className="mx-auto relative">
@@ -73,7 +47,7 @@ export default function ChatInput({ onSend, disabled = false, isLoading = false 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about Medicare... (Shift+Enter for new line)"
+            placeholder="Ask about Medicare..."
             disabled={disabled || isLoading}
             rows={1}
             className="w-full resize-none bg-gray-50 border border-gray-300 rounded-2xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 placeholder-gray-500 max-h-32 overflow-y-auto"
